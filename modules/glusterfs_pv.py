@@ -29,7 +29,7 @@ description:
     - Creates, removes, resizes, and changes a Physical Volume.
 
 options:
-    action:
+    state:
         required: true
         choices: [create, remove, resize, change]
         description: Specifies the pv operation that is to be executed,
@@ -66,7 +66,7 @@ options:
 
 EXAMPLES = '''
 #Create Physical Volumes /dev/vdb with dataalignment 1280k
-    - pv: action=create disk=<disk name> for eg, /dev/vdb
+    - pv: state=create disk=<disk name> for eg, /dev/vdb
           force='y'
           uuid=<uuid>
           zero='y'
@@ -74,7 +74,7 @@ EXAMPLES = '''
          - disk1
 
 #Remove Physical Volumes /dev/vdb
-    - pv: action=remove disk=<disk name>
+    - pv: state=remove disk=<disk name>
           force='y'
       with_items:
          - disk1
@@ -88,7 +88,7 @@ class PvOps(object):
 
     def __init__(self, module):
         self.module = module
-        self.action = self.validated_params('action')
+        self.state = self.validated_params('state')
 
     def validated_params(self, opt):
         value = self.module.params[opt]
@@ -110,17 +110,17 @@ class PvOps(object):
     def pv_presence_check(self, disk):
         rc, out, err = self.run_command('pvdisplay', ' ' + disk)
         ret = 0
-        if self.action == 'create' and not rc:
+        if self.state == 'create' and not rc:
             self.module.exit_json(rc=0, changed=0, msg="%s Physical Volume"
                                   " Exists!" % disk)
-        elif self.action == 'remove' and rc:
+        elif self.state == 'remove' and rc:
             self.module.exit_json(rc=0, changed=0, msg="%s Physical Volume"
                                   "Doesn't Exists!" % disk)
         else:
             ret = 1
         return ret
 
-    def pv_action(self):
+    def pv_state(self):
         self.disk = self.module.params['disk']
         if not self.disk:
             self.disk = self.module.params['disks']
@@ -130,7 +130,7 @@ class PvOps(object):
     def get_volume_command(self, disk):
         args = ' ' + str(disk)
 
-        if self.action == 'create':
+        if self.state == 'create':
             force = self.module.params['force']
             if force == 'y':
                 args += " -f"
@@ -147,11 +147,11 @@ class PvOps(object):
             dataalignment = self.module.params['dataalignment']
             if dataalignment:
                 args += " --dataalignment " + dataalignment
-        elif self.action == 'remove':
+        elif self.state == 'remove':
             force = self.module.params['force']
             if force == 'y':
                 args += " -f"
-        elif self.action == 'change':
+        elif self.state == 'change':
             uuid = self.module.params['uuid']
             if uuid:
                 args += " -u " + uuid
@@ -162,7 +162,7 @@ class PvOps(object):
             allocatable = self.module.params['allocatable']
             if allocatable == 'n':
                 args += " -x " + allocatable
-        elif self.action == 'resize':
+        elif self.state == 'resize':
             setphysicalvolumesize = self.module.params['setphysicalvolumesize']
             if setphysicalvolumesize:
                 args += " --setphysicalvolumesize " + setphysicalvolumesize
@@ -172,7 +172,7 @@ class PvOps(object):
 if __name__ == '__main__':
     module = AnsibleModule(
         argument_spec=dict(
-            action=dict(choices=["create", "remove", "resize", "change"], required=True),
+            state=dict(choices=["create", "remove", "resize", "change"], required=True),
             disks=dict(),
             disk=dict(),
             force=dict(type='str'),
@@ -188,7 +188,7 @@ if __name__ == '__main__':
     )
 
     pvops = PvOps(module)
-    cmd = pvops.pv_action()
+    cmd = pvops.pv_state()
     pvops.pv_presence_check(pvops.disk)
-    rc, out, err = pvops.run_command('pv' + pvops.action, cmd)
+    rc, out, err = pvops.run_command('pv' + pvops.state, cmd)
     pvops.get_output(rc, out, err)

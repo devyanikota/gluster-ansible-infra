@@ -28,7 +28,7 @@ short_description: Create, extend, reduce, convert, and remove a Volume Group.
 description:
     - Creates, extends, reduces, converts, and removes a Volume Group.
 options:
-    action:
+    state:
         required: true
         choices: [create,  extend, reduce, convert, remove]
         description: Specifies the vg operation that is to be executed on the vg
@@ -77,13 +77,13 @@ options:
 
 EXAMPLES = '''
 #Create Volume Groups on PVS /dev/vdb1
-    - vg: action=create disk={{item}}
+    - vg: state=create disk={{item}}
       with_items:
       -vgname1
       -vgname2
 
 #Remove Volume Groups RHS_vg1, RHS_vg2 and RHS_vg3
-    - vg: action=remove
+    - vg: state=remove
       with_items:
       -vgname1
       -vgname2
@@ -97,12 +97,12 @@ class VgOps(object):
 
     def __init__(self, module):
         self.module = module
-        self.action = self.validated_params('action')
-        self.op = 'vg' + self.action
+        self.state = self.validated_params('state')
+        self.op = 'vg' + self.state
         self.vgname = self.validated_params('vgname')
         self.disk = self.module.params['disk']
 
-    def vg_actions(self):
+    def vg_states(self):
         self.disk = self.module.params['disk']
         if not self.disk:
             self.disk = self.module.params['disks']
@@ -113,7 +113,7 @@ class VgOps(object):
         args = " "
         if not self.vgname:
             self.module.exit_json(rc=1, msg="Nothing to be done")
-        elif self.action == 'create':
+        elif self.state == 'create':
             if not self.disk:
                 self.module.exit_json(rc=1, msg="Nothing to be done")
             self.disktype = self.module.params['disktype']
@@ -141,9 +141,9 @@ class VgOps(object):
             dataalignmentoffset = self.module.params['dataalignmentoffset']
             if dataalignmentoffset:
                 args += " --dataalignmentoffset " + dataalignmentoffset
-        elif self.action == 'remove':
+        elif self.state == 'remove':
             args = " -y -ff " + self.vgname
-        elif self.action == 'extend':
+        elif self.state == 'extend':
             if not hasattr(self, 'disk'):
                 self.disk = self.validated_params('disk')
             args = " %s %s" % (self.vgname, self.disk)
@@ -162,21 +162,21 @@ class VgOps(object):
             dataalignmentoffset = self.module.params['dataalignmentoffset']
             if dataalignmentoffset:
                 args += " --dataalignmentoffset " + dataalignmentoffset
-        elif self.action == 'reduce':
+        elif self.state == 'reduce':
             if not hasattr(self, 'disk'):
                 self.disk = self.validated_params('disk')
             args = " %s %s" % (self.vgname, self.disk)
             removemissing = self.module.params['removemissing']
             if removemissing:
                 args += "--removemissing"
-        elif self.action == 'convert':
+        elif self.state == 'convert':
             args += " %s " % (self.vgname)
             metadatatype = self.module.params['metadatatype']
             if metadatatype:
                 args += " -M" + metadatatype
             # self.module.exit_json(rc=1, msg=args)
         else:
-            self.module.fail_json(rc=1, msg="Unknown action")
+            self.module.fail_json(rc=1, msg="Unknown state")
         return args
 
     def validated_params(self, opt):
@@ -200,29 +200,29 @@ class VgOps(object):
 
     def vg_presence_check(self, vg):
         rc, out, err = self.run_command('vgdisplay', ' ' + vg)
-        if self.action == 'create' and not rc:
+        if self.state == 'create' and not rc:
             # volume group exists, exit!
             self.module.exit_json(changed=False, rc=1,
                                   msg="A volume group called %s already exists"
                                   % vg)
-        elif self.action == 'extend' and rc:
+        elif self.state == 'extend' and rc:
             # volume group does not exist, exit!
             self.module.exit_json(changed=False, rc=1,
                                   msg="A volume group %s not found." % vg)
-        elif self.action == 'reduce' and rc:
+        elif self.state == 'reduce' and rc:
             # volume group does not exist, exit!
             self.module.exit_json(changed=False, rc=1,
                                   msg="A volume group %s not found." % vg)
-        elif self.action == 'convert' and rc:
+        elif self.state == 'convert' and rc:
             # volume group does not exist, exit!
             self.module.exit_json(changed=False, rc=1,
                                   msg="A volume group %s not found." % vg)
-        elif self.action == 'remove' and rc:
+        elif self.state == 'remove' and rc:
             self.module.exit_json(changed=False, rc=1,
                                   msg="Volume group %s not found" % vg)
 
     def pv_presence_check(self, disk):
-        if self.action not in ['create', 'extend']:
+        if self.state not in ['create', 'extend']:
             return 1
         rc, out, err = self.run_command('pvdisplay', ' ' + disk)
         if rc:
@@ -242,7 +242,7 @@ class VgOps(object):
 if __name__ == '__main__':
     module = AnsibleModule(
         argument_spec=dict(
-            action=dict(choices=["create", "remove", "extend", "reduce", "convert"], required=True),
+            state=dict(choices=["create", "remove", "extend", "reduce", "convert"], required=True),
             vgname=dict(type='str'),
             disks=dict(),
             disk=dict(),
@@ -265,7 +265,7 @@ if __name__ == '__main__':
 
     vgops = VgOps(module)
     vgops.vg_presence_check(vgops.vgname)
-    opts = vgops.vg_actions()
+    opts = vgops.vg_states()
     vgops.pv_presence_check(vgops.disk)
     rc, out, err = vgops.run_command(vgops.op, opts)
     vgops.get_output(rc, out, err)

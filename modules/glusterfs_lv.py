@@ -30,7 +30,7 @@ description:
     - Creates, resizes, changes, reduces, converts, extends, renames, and removes
       Logical Volumes and Thin Pools of remote hosts
 options:
-    action:
+    state:
         required: true
         choices: [create,resize,change,reduce,convert,extend, rename,remove]
         description: Specifies the LV operation that is to be executed,
@@ -48,16 +48,16 @@ options:
                      associated or with which the LVs are associated.
    lvtype:
         required: true
-        action: create
+        state: create
         choices: [thin, thick, virtual]
-        description: Required with the create action of the LV module.
+        description: Required with the create state of the LV module.
                      With the option thick, the module creates a metadata LV,
                      With the option thin, the module creates a thin pool and
                      with hte option virtual, logical volumes for the pool will
                      be created.
     compute:
         required: true
-        action: create
+        state: create
         choice: [rhs]
         description: This is an RHS specific computation for LV creation.
                      Pool size and metadata LV size will be calculated as per
@@ -65,13 +65,13 @@ options:
                      other specifics is needed.
     thinpool:
         required: true
-        action: convert
-        desciption: Required with the action convert, this can be used to
+        state: convert
+        desciption: Required with the state convert, this can be used to
                     associate metadata LVs with thin pools. thinpool name
                     should be in the format vgname/lvname
     poolmetadata:
         required: true
-        action: convert
+        state: convert
         description: This specifies the name of the metadata LV that is to
                      be associated with the thinpool described by the
                      previos option
@@ -85,37 +85,37 @@ options:
         required: false
         choices: [y, n]
         description: Set zeroing mode for thin pool. To be used with the
-                     change action of the logical volume.
+                     change state of the logical volume.
 '''
 
 EXAMPLES = '''
     Create logical volume named metadata
-    lv: action=create
+    lv: state=create
         lvname=metadata
         lvtype=thinpool
         vgname=RHS_vg1
     Create a thin pool
-    lv: action=create
+    lv: state=create
         lvname=RHS_pool1
         lvtype=thin
         vgname=RHS_vg1
     Convert the logical volume
-    lv: action=convert
+    lv: state=convert
         thinpool='RHS_vg1/RHS_pool1
         poolmetadata='RHS_vg1'/'metadata' poolmetadataspare=n
         vgname=RHS_vg1
     Create logical volume for the pools
-    lv: action=create poolname='RHS_pool1' lvtype="virtual"
+    lv: state=create poolname='RHS_pool1' lvtype="virtual"
         compute=rhs
         vgname=RHS_vg1
         lvname=RHS_lv1
     Change the attributes of the logical volume
-    lv: action=change
+    lv: state=change
         zero=n
         vgname='RHS_vg1'
         poolname='RHS_pool1'
     Remove logical volumes
-    lv: action=remove
+    lv: state=remove
         vgname=RHS_vg1
         lvname=RHS_lv1
 ---
@@ -130,13 +130,13 @@ class LvOps(object):
 
     def __init__(self, module):
         self.module = module
-        self.action = self.validated_params('action')
+        self.state = self.validated_params('state')
         self.vgname = self.validated_params('vgname')
         self.lvname = self.validated_params('lvname')
-        if self.action not in ['rename', 'remove', 'resize', 'change']:
+        if self.state not in ['rename', 'remove', 'resize', 'change']:
             self.pvname = self.validated_params('pvname')
 
-    def lv_action(self):
+    def lv_state(self):
         cmd = {'create': self.create,
                'change': self.change,
                'extend': self.extend,
@@ -144,7 +144,7 @@ class LvOps(object):
                'reduce': self.reduce,
                'rename': self.rename,
                'remove': self.remove
-               }[self.action]()
+               }[self.state]()
         return cmd
 
     def get_output(self, rc, output, err):
@@ -253,10 +253,10 @@ class LvOps(object):
         rc, out, err = self.run_command('lvdisplay', ' ' + self.vgname +
                                         '/' + lvname)
         ret = 0
-        if self.action == 'create' and not rc:
+        if self.state == 'create' and not rc:
             self.module.exit_json(changed=0, msg="%s Logical Volume Exists!"
                                   % lvname)
-        elif self.action in ['convert', 'change', 'remove'] and rc:
+        elif self.state in ['convert', 'change', 'remove'] and rc:
             self.module.exit_json(changed=0, msg="%s Logical Volume Doesn't "
                                   "Exists!" % lvname)
         else:
@@ -419,7 +419,7 @@ class LvOps(object):
 if __name__ == '__main__':
     module = AnsibleModule(
         argument_spec=dict(
-            action=dict(choices=["create", "change", "resize",
+            state=dict(choices=["create", "change", "resize",
                                  "reduce", "remove", 'rename', 'extend']),
             lvname=dict(type='str'),
             lv=dict(),
@@ -458,6 +458,6 @@ if __name__ == '__main__':
     )
 
     lvops = LvOps(module)
-    cmd = lvops.lv_action()
-    rc, out, err = lvops.run_command('lv' + lvops.action, ' ' + cmd)
+    cmd = lvops.lv_state()
+    rc, out, err = lvops.run_command('lv' + lvops.state, ' ' + cmd)
     lvops.get_output(rc, out, err)
