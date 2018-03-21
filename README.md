@@ -24,7 +24,7 @@ Example Playbook
 
 ```
 
-[![asciicast]()]()
+[![asciicast](https://asciinema.org/a/AedXtexsG8DwCFubgeBCxiyxx.png)](https://asciinema.org/a/AedXtexsG8DwCFubgeBCxiyxx)
 
 License
 -------
