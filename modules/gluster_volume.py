@@ -355,23 +355,22 @@ def remove_bricks(name, removed_bricks):
     success = False
     retries = 0
     while retries < max_tries and not success:
-        br = removed_bricks[0]
+        br = removed_bricks[-1]
         out = run_gluster(['volume', 'remove-brick', name, br, 'status'])
         for row in out.split('\n')[2:]:
             if 'completed' in row:
                 args_c.append('commit')
                 success = True
+                break
             else:
-                output = "remove-brick operation still in process..."
-                print(output)
+                print("remove-brick operation still in process...")
                 time.sleep(10)
         retries += 1
     if success:
         run_gluster(args_c)
     else:
-        output += "Exceeded number of tries, check remove-brick status"
-        output += "Commit operation needs to be followed."
-        print(output)
+        print("Exceeded number of tries, check remove-brick status\
+               Commit operation needs to be followed.")
 
 
 def do_rebalance(name):
